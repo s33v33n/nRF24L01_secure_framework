@@ -69,7 +69,8 @@ int nrf_init(){
     // device open
     nrf_fd = open(dev_file, O_RDWR);
     if (nrf_fd < 0) {
-        fprintf(stderr, "ERROR: cannot open%s.\n", dev_file);
+        perror("ERROR: Failed to open device");
+        fprintf(stderr, "Could not open '%s' (try with sudo)\n", dev_file);
         free(dev_file);
         return -1;
     }
@@ -83,15 +84,17 @@ int nrf_init(){
         .address = node_config.rx_pipe_addr
     };
 
-    // RX address
-    if(ioctl(nrf_fd, NRF_IOCTL_SET_RX_ADDR, &rx_pipe_config) < 0){
-        perror("IOCTL: cannot write rx pipe config");
+    // TX default address (e.g. Master)
+    if(ioctl(nrf_fd, NRF_IOCTL_SET_TX_ADDR, &master_config.rx_pipe_addr) < 0){
+        perror("IOCTL: cannot write tx address");
         return -1;
     }
 
-    // TX address
-    if(ioctl(nrf_fd, NRF_IOCTL_SET_TX_ADDR, &master_config.rx_pipe_addr) < 0){
-        perror("IOCTL: cannot write tx adderss");
+    // RX listening address for this node
+    // Must be set AFTER SET_TX_ADDR because SET_TX_ADDR sets pipe 0 for Auto-ACK.
+    // Setting RX_ADDR here guarantees that this node listens on its own rx_pipe_addr!
+    if(ioctl(nrf_fd, NRF_IOCTL_SET_RX_ADDR, &rx_pipe_config) < 0){
+        perror("IOCTL: cannot write rx pipe config");
         return -1;
     }
 
@@ -162,7 +165,15 @@ int nrf_master_send(uint8_t target_node_id, char *message){
     // send package
     int send_ret = send_packet(nrf_fd, master_config.id, message);
 
-    // return to master config
+    // return to master config (restore Master listening RX pipe 0)
+    struct nrf_pipe_config master_rx_pipe = {
+        .pipe_num = master_config.rx_pipe_num,
+        .address = master_config.rx_pipe_addr
+    };
+    if (ioctl(nrf_fd, NRF_IOCTL_SET_RX_ADDR, &master_rx_pipe) < 0) {
+        perror("IOCTL: Failed to restore Master RX pipe");
+    }
+
     if(ioctl(nrf_fd, NRF_IOCTL_SET_CHANNEL, &master_config.channel) < 0) {
         perror("IOCTL: Failed to return to TX RF master channel");
         return -1;
@@ -187,6 +198,12 @@ int nrf_node_send(char *message) {
         return -1;
     }
 
+    // Set TX address to Master (and pipe 0 to master address for receiving ACK)
+    if (ioctl(nrf_fd, NRF_IOCTL_SET_TX_ADDR, &master_config.rx_pipe_addr) < 0) {
+        perror("IOCTL: Failed to set TX address to Master");
+        return -1;
+    }
+
     // rf master config
     if (ioctl(nrf_fd, NRF_IOCTL_SET_CHANNEL, &master_config.channel) < 0) {
         perror("IOCTL: Failed to set master RF channel");
@@ -200,6 +217,15 @@ int nrf_node_send(char *message) {
 
     // send package
     int send_ret = send_packet(nrf_fd, node_config.id, message);
+
+    // Restore node's own listening address on RX pipe 0
+    struct nrf_pipe_config node_rx_pipe = {
+        .pipe_num = node_config.rx_pipe_num,
+        .address = node_config.rx_pipe_addr
+    };
+    if (ioctl(nrf_fd, NRF_IOCTL_SET_RX_ADDR, &node_rx_pipe) < 0) {
+        perror("IOCTL: Failed to return to node RX pipe");
+    }
 
     // return to node rf config
     if (ioctl(nrf_fd, NRF_IOCTL_SET_CHANNEL, &node_config.channel) < 0) {

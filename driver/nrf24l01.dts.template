@@ -1,9 +1,14 @@
 /dts-v1/;
 /plugin/;
 
+// spi0
 &spidev0 { status = "disabled"; };
+
+// spi1
 &spidev1 { status = "disabled"; };
 
+
+// spi0
 &spi0 {
 	#address-cells = <1>;
 	#size-cells = <0>;
@@ -26,6 +31,8 @@
 	};
 };
 
+
+// spi1
 &gpio {
 	spi1_pins_overlay: spi1_pins_overlay {
 		brcm,pins = <__SPI1_MISO__ __SPI1_MOSI__ __SPI1_SCLK__>;
@@ -41,6 +48,8 @@
 	};
 };
 
+
+// spi1
 &spi1 {
 	#address-cells = <1>;
 	#size-cells = <0>;

@@ -45,10 +45,11 @@ int send_packet(int fd, uint8_t sender_id, const char *message) {
     uint32_t chacha_block[CHACHA_BLOCKS] = {0};
     generate_chacha20_block(NRF_NETWORK_KEY, 0, nonce, chacha_block);
 
-    // encrypt message
+    // encrypt message (all 11 bytes padded with 0 to prevent garbage on decryption and hide length)
     uint8_t *keystream = (uint8_t *)chacha_block;
-    for (size_t i = 0; i < msg_len; i++) {
-        package_to_send[5 + i] = (uint8_t)message[i] ^ keystream[32 + i];
+    for (size_t i = 0; i < 11; i++) {
+        uint8_t byte_to_enc = (i < msg_len) ? (uint8_t)message[i] : 0;
+        package_to_send[5 + i] = byte_to_enc ^ keystream[32 + i];
     }
 
     // create poly tag

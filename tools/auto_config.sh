@@ -24,16 +24,21 @@ if ! [[ "$NUM_NODES" =~ ^[0-9]+$ ]] || [ "$NUM_NODES" -lt 2 ]; then
     NUM_NODES=2
 fi
 
+generate_rf_addr() {
+    while true; do
+        raw=$(hexdump -vn 5 -e '5/1 "%02X"' /dev/urandom)
+        first_b="${raw:0:2}"
+        if [ "$first_b" != "55" ] && [ "$first_b" != "AA" ] && \
+           [ "$first_b" != "00" ] && [ "$first_b" != "FF" ] && \
+           [ "$raw" != "0000000000" ] && [ "$raw" != "FFFFFFFFFF" ]; then
+            echo "0x${raw}ULL"
+            break
+        fi
+    done
+}
+
 # 1. random master address
-while true; do
-    raw=$(hexdump -vn 5 -e '5/1 "%02X"' /dev/urandom)
-    first_byte="${raw:0:2}"
-    if [ "$first_byte" != "55" ] && [ "$first_byte" != "AA" ] && \
-       [ "$raw" != "0000000000" ] && [ "$raw" != "FFFFFFFFFF" ]; then
-        MASTER_ADDR="0x${raw}ULL"
-        break
-    fi
-done
+MASTER_ADDR=$(generate_rf_addr)
 
 # 2. random 256-bit key
 KEY_WORDS=($(od -vAn -N32 -tx4 /dev/urandom))
@@ -81,10 +86,20 @@ for ((i = 0; i < NUM_NODES; i++)); do
     fi
 
     if [ "$i" -eq 0 ]; then
-        echo "    {\"master\", 0x00, NRF_MASTER_ADDRESS, 0, 0, 1, 1, 1}${comma}" >> "$TARGET_FILE"
+        echo "    {DEV_NAME_SPI0, 0x00, NRF_MASTER_ADDRESS, 0, 0, 15, 0, 1}${comma}" >> "$TARGET_FILE"
     else
-        # Nodes addresses: 0x0000000001ULL, 0x0000000002ULL itd.
-        printf "    {\"nrf_dev_%d\", 0x00, 0x%010XULL, 0, %d, 1, 1, 1}%s\n" "$i" "$i" "$i" "$comma" >> "$TARGET_FILE"
+        while true; do
+            NODE_ADDR=$(generate_rf_addr)
+            if [ "$NODE_ADDR" != "$MASTER_ADDR" ]; then
+                break
+            fi
+        done
+
+        if [ "$i" -eq 1 ]; then
+            echo "    {DEV_NAME_SPI1, 0x00, ${NODE_ADDR}, 0, ${i}, 15, 0, 1}${comma}" >> "$TARGET_FILE"
+        else
+            echo "    {DEV_NAME_SPI0, 0x00, ${NODE_ADDR}, 0, ${i}, 15, 0, 1}${comma}" >> "$TARGET_FILE"
+        fi
     fi
 done
 
@@ -97,5 +112,5 @@ EOF
 echo "Generated default secure configuration in ${TARGET_FILE}:"
 echo "  - Master Address : ${MASTER_ADDR}"
 echo "  - Network Key    : 256 bits random (ChaCha20-Poly1305)"
-echo "  - Total Nodes    : ${NUM_NODES} (Node 0: master, Node 1..$((NUM_NODES-1)): nrf_dev_1..)"
-echo "  - Channels/Power : channel=1, power=1, speed=1, pipe=0"
+echo "  - Total Nodes    : ${NUM_NODES} (Node 0: DEV_NAME_SPI0, Node 1: DEV_NAME_SPI1..)"
+echo "  - Channels/Power : channel=15, power=0, speed=1, pipe=0"

@@ -32,8 +32,14 @@ int main(int argc, char *argv[]){
             return -1;
         }
 
-        // check rx pipe number
+        // check rx pipe address
         uint64_t uniqe_addr = nrf_nodes[i].rx_pipe_addr;
+        uint8_t msb = (uint8_t)((uniqe_addr >> 32) & 0xFF);
+        if (msb == 0xAA || msb == 0x55 || msb == 0x00 || msb == 0xFF) {
+            printf("Node: %d error - MSByte of rx_pipe_addr (0x%02X) cannot be 0xAA, 0x55, 0x00, or 0xFF (nRF24L01 specification)\n", i, msb);
+            return -1;
+        }
+
         for(int j=i + 1; j < nodes_counter; j++){
             if(uniqe_addr == nrf_nodes[j].rx_pipe_addr){
                 printf("The same address for nodes %d and %d\n", i, j);
