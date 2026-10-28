@@ -1,6 +1,6 @@
 # Secure nRF24L01+ Framework
 
-Secure RF communication framework for **nRF24L01+** transceivers on Linux platforms (e.g. Raspberry Pi). The project integrates a custom Linux SPI kernel driver with authenticated encryption (**ChaCha20-Poly1305**), providing a secure star-topology wireless network for up to 256 devices.
+Secure RF communication framework for **nRF24L01+** transceivers on Linux platforms (e.g. Raspberry Pi). The project integrates a custom Linux SPI kernel driver with authenticated encryption (**ChaCha20-Poly1305**), providing a secure star-topology up to 256 devices.
 
 ---
 
@@ -49,7 +49,7 @@ The fixed 32-byte hardware payload of the nRF24L01+ is structured as follows:
 The provided `user_config/hardware_config.h` and `driver/nrf24l01.dts.template` serve as a reference example for **two nRF24L01+ modules connected simultaneously** to a Raspberry Pi (using SPI0 and SPI1).
 
 Hardware wiring depends on your target board:
-* **Using the provided example:** If your hardware wiring matches the pins defined in `hardware_config.h`, you can use the template as-is.
+* **Using the provided example:** If your hardware wiring matches the pins defined in `hardware_config.h`, you can use the template.
 * **Single SPI module (e.g. only SPI0):** If you only use one module on SPI0:
   * In `user_config/hardware_config.h`: Set `#define RADIO_SPI1_ENABLE 0` and adjust `#define NRF_NDEVICES 1`.
   * In `driver/nrf24l01.dts.template`: Comment out or remove all SPI1-related sections (comments are marked above the appropriate sections).
